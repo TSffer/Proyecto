@@ -1,0 +1,15 @@
+Un móvil se desplaza 
+con MRUV partiendo 
+del reposo con 
+una aceleración 
+de 4 m/s^2
+
+calcular:
+
+¿Qué velocidad 
+tendrá a los 10 s
+y que distancia 
+ha recorrido?
+
+
+

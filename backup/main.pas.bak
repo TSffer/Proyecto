@@ -1,0 +1,310 @@
+unit main;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Classes, SysUtils, FileUtil, TAGraph, Forms, Controls, Graphics, Dialogs,
+  StdCtrls, LCLType, ExtCtrls, ColorBox, ComCtrls, Grids, ValEdit, ParseMath,
+  TASeries, TAFuncSeries, TARadialSeries, TATools, TAChartExtentLink, Types,
+  Interseccion, math;
+
+type
+
+  { TForm1 }
+  TForm1 = class(TForm)
+    Button1: TButton;
+    Chart1: TChart;
+    Chart1LineSeries1: TLineSeries;
+    ChartToolset1: TChartToolset;
+    ChartToolset1DataPointClickTool1: TDataPointClickTool;
+    ChartToolset1ZoomMouseWheelTool1: TZoomMouseWheelTool;
+    colorbtnFunction: TColorButton;
+    ediMin: TEdit;
+    ediMax: TEdit;
+    ediStep: TEdit;
+    Edit1: TEdit;
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    Label5: TLabel;
+    ListBox1: TListBox;
+    Panel1: TPanel;
+    ScrollBox1: TScrollBox;
+    StaticText1: TStaticText;
+    StaticText2: TStaticText;
+    StaticText3: TStaticText;
+    StaticText4: TStaticText;
+    StatusBar1: TStatusBar;
+    StringGrid1: TStringGrid;
+    TrackBar1: TTrackBar;
+    trbarVisible: TTrackBar;
+    procedure Button1Click(Sender: TObject);
+    procedure ChartToolset1DataPointClickTool1PointClick(ATool: TChartTool;
+      APoint: TPoint);
+    procedure ChartToolset1ZoomMouseWheelTool1AfterKeyDown(ATool: TChartTool;
+      APoint: TPoint);
+    procedure FormDestroy(Sender: TObject);
+    procedure FunctionSeriesCalculate(const AX: Double; out AY: Double);
+    procedure FormShow(Sender: TObject);
+    procedure FunctionsEditKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormCreate(Sender: TObject);
+    procedure Label5Click(Sender: TObject);
+    procedure StaticText1Click(Sender: TObject);
+    procedure StaticText3Click(Sender: TObject);
+    procedure trbarVisibleChange(Sender: TObject);
+    procedure EncontrarInterseccion();
+  private
+    FunctionList,
+    EditList: TList;
+    ActiveFunction: Integer;
+    min,
+    max: Real;
+    Parse  : TparseMath;
+    function f( x: Real ): Real;
+    procedure CreateNewFunction;
+    procedure Graphic2D;
+
+  public
+
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+const
+  FunctionEditName = 'FunctionEdit';
+  FunctionSeriesName = 'FunctionLines';
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  FunctionList:= TList.Create;
+  EditList:= TList.Create;
+  min:= -5.0;
+  max:= 5.0;
+  Parse:= TParseMath.create();
+  Parse.AddVariable('x', min);
+
+end;
+
+
+procedure TForm1.trbarVisibleChange(Sender: TObject);
+begin
+  Self.AlphaBlendValue:= trbarVisible.Position;
+end;
+
+function TForm1.f( x: Real ): Real;
+begin
+  //func:= TEdit( EditList[ ActiveFunction ] ).Text;
+  Parse.Expression:= TEdit( EditList[ ActiveFunction ] ).Text;
+  Parse.NewValue('x', x);
+  Result:= Parse.Evaluate();
+
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+var
+  i:Integer;
+begin
+  Parse.destroy;
+  for i:=0 to FunctionList.Count do
+  begin
+      FunctionList.Delete(i);
+  end;
+
+  for i:=0 to EditList.Count do
+  begin
+      EditList.Delete(i);
+  end;
+  FunctionList.Destroy;
+  EditList.Destroy;
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  i:Integer;
+begin
+  StringGrid1.Clear;
+  ListBox1.Clear;
+  Chart1LineSeries1.Clear;
+  Label4.Caption:='';
+  Label5.Caption:='';
+  TEdit(Self.FindComponent('sen(x)')).Free;
+  TEdit(Self.FindComponent(String(FunctionList.Items[0]))).Free;
+  {for i:=0 to FunctionList.Count do
+  begin
+      FunctionList.Delete(i);
+  end;
+
+  for i:=0 to EditList.Count do
+  begin
+      EditList.Delete(i);
+  end;
+  FunctionList.Destroy;
+  EditList.Destroy;  }
+
+  {Chart1.ClearSeries;}
+end;
+
+
+procedure TForm1.ChartToolset1DataPointClickTool1PointClick(ATool: TChartTool;
+  APoint: TPoint);
+var
+  x, y: Double;
+begin
+  with ATool as TDatapointClickTool do
+    if (Series is TLineSeries) then
+      with TLineSeries(Series) do begin
+        x := GetXValue(PointIndex);
+        y := GetYValue(PointIndex);
+        Statusbar1.SimpleText := Format('%s: x = %f, y = %f', [TEdit(EditList.Items[Tag]).Caption, x, y]);
+        ListBox1.AddItem(TEdit(EditList.Items[Tag]).Caption,TEdit(EditList.Items[Tag]));
+        EncontrarInterseccion();
+      end
+    else
+    begin
+      Statusbar1.SimpleText:='';
+    end;
+end;
+
+procedure TForm1.ChartToolset1ZoomMouseWheelTool1AfterKeyDown(
+  ATool: TChartTool; APoint: TPoint);
+begin
+
+end;
+
+procedure TForm1.FunctionSeriesCalculate(const AX: Double; out AY: Double);
+begin
+   // AY:= f( AX )
+
+end;
+
+procedure TForm1.FormShow(Sender: TObject);
+begin
+  CreateNewFunction;
+end;
+
+procedure TForm1.FunctionsEditKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+
+  if not (key = VK_RETURN) then
+     exit;
+
+   with TEdit( Sender ) do begin
+       ActiveFunction:= Tag;
+       Graphic2D;
+       if tag = EditList.Count - 1 then
+          CreateNewFunction;
+   end;
+
+end;
+
+procedure TForm1.Graphic2D;
+var x, h: Real;
+
+begin
+  h:= StrToFloat( ediStep.Text );
+  min:= StrToFloat( ediMin.Text );
+  max:= StrToFloat( ediMax.Text );
+
+  with TLineSeries( FunctionList[ ActiveFunction ] ) do begin
+       LinePen.Color:= colorbtnFunction.ButtonColor;
+       LinePen.Width:= TrackBar1.Position;
+
+  end;
+
+  x:= min;
+  TLineSeries( FunctionList[ ActiveFunction ] ).Clear;
+  with TLineSeries( FunctionList[ ActiveFunction ] ) do
+  repeat
+      AddXY( x, f(x) );
+      x:= x + h
+  until ( x>= max );
+end;
+
+procedure TForm1.CreateNewFunction;
+begin
+   EditList.Add( TEdit.Create(ScrollBox1) );
+
+   //We create Edits with functions
+   with Tedit( EditList.Items[ EditList.Count - 1 ] ) do begin
+        Parent:= ScrollBox1;
+        Align:= alTop;
+        name:= FunctionEditName + IntToStr( EditList.Count );
+        OnKeyUp:= @FunctionsEditKeyUp;
+        Font.Size:= 15;
+        Text:= EmptyStr;
+        Tag:= EditList.Count - 1;
+        SetFocus;
+
+   end;
+
+   //We create serial functions
+   FunctionList.Add( TLineSeries.Create( Chart1 ) );
+   with TLineSeries( FunctionList[ FunctionList.Count - 1 ] ) do begin
+        Name:= FunctionSeriesName + IntToStr( FunctionList.Count );
+        Tag:= EditList.Count - 1; // Edit Asossiated
+
+   end;
+
+
+   Chart1.AddSeries( TLineSeries( FunctionList[ FunctionList.Count - 1 ] ) );
+
+end;
+
+procedure TForm1.EncontrarInterseccion();
+var
+  PuntosInterseccion:TInterseccion;
+  funcion:string;
+  i:Integer;
+  puntos:vector;
+  fx1:TParseMath;
+  CantDecimals:Integer;
+begin
+   CantDecimals:=trunc(1/StrToFloat(Edit1.Text));
+   if (ListBox1.Count mod 2) = 0 then
+       begin
+         StringGrid1.Clean;
+         Chart1LineSeries1.Clear;
+
+         Label4.Caption:='f(x) = '+ListBox1.Items[ListBox1.Count-2];
+         Label5.Caption:='g(x) = '+ListBox1.Items[ListBox1.Count-1];
+
+         fx1 := TParseMath.create();
+         fx1.Expression := ListBox1.Items[ListBox1.Count-1];
+         fx1.AddVariable('x',0);
+         SetLength(puntos,50);
+         PuntosInterseccion := TInterseccion.create();
+         funcion:='('+ListBox1.Items[ListBox1.Count-2]+')'+'-'+'('+ListBox1.Items[ListBox1.Count-1]+')';
+         PuntosInterseccion.presicion:=StrToFloat(Edit1.text);
+
+         PuntosInterseccion.execute(StrToFloat(ediMin.Text),StrToFloat(ediMax.Text),funcion);
+         puntos:=PuntosInterseccion.Interseccion;
+         if(PuntosInterseccion.rows=0) then
+           exit();
+
+         StringGrid1.RowCount:=PuntosInterseccion.rows;
+         StringGrid1.ColCount:=2;
+
+         showMessage(IntToStr(PuntosInterseccion.rows));
+         for i:=0 to PuntosInterseccion.rows-1 do
+         begin
+             fx1.NewValue('x',puntos[i]);
+             Chart1LineSeries1.AddXY(puntos[i],fx1.Evaluate());
+             Chart1LineSeries1.AddXY(NaN,NaN);
+             StringGrid1.Cells[0,i]:=(FloatToStr(puntos[i]));
+             StringGrid1.Cells[1,i]:=(FloatToStr(trunc(round(fx1.Evaluate()*CantDecimals))/CantDecimals));
+         end;
+         Chart1LineSeries1.ShowPoints:=True;
+       end;
+end;
+
+{$R *.lfm}
+
+end.
+
+
